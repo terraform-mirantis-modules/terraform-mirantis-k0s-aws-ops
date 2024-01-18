@@ -14,19 +14,19 @@ locals {
     var.ssh_algorithm == "ed25519" ?
     tls_private_key.common_tls_ed25519 :
     tls_private_key.common_tls_rsa
-    )
+  )
   common_ssh_key_filename = (
     var.ssh_algorithm == "ed25519" ?
     "key_ed25519.key" :
     "key_rsa.key"
-    )
+  )
 
 }
 
 resource "local_file" "common_ssh_public_key" {
   content  = local.common_ssh_key.private_key_openssh
-  filename = "${var.key_path}/${local.common_ssh_key_filename}"
-  
+  filename = "${var.key_path}${local.common_ssh_key_filename}"
+
   provisioner "local-exec" {
     command = "chmod 0600 ${local_file.common_ssh_public_key.filename}"
   }
@@ -38,6 +38,6 @@ resource "aws_key_pair" "common" {
 
   tags = merge({
     stack = var.name
-    role = "sshkey"
+    role  = "sshkey"
   }, var.tags)
 }

@@ -15,15 +15,6 @@ variable "cidr" {
 variable "tags" {
   description = "tags to be applied to created resources"
   type        = map(string)
-  default = {
-    "created_with" = "mirantis-k0s-aws-ops"
-  }
-}
-
-variable "region" {
-  description = "AWS Region to create resources in"
-  type        = string
-  default     = "us-east-1"
 }
 
 variable "public_subnet_count" {
@@ -48,6 +39,45 @@ variable "enable_vpn_gateway" {
   description = "Should a VPN gateway be included in the cluster"
   type        = bool
   default     = false
+}
+
+variable "firewall" {
+  description = "VPC Network Security group configuration"
+  type = object({
+    ingress_ipv4 = list(object({
+      description = string
+      from_port   = number
+      to_port     = number
+      protocol    = string
+      cidr_blocks = list(string)
+      self        = bool
+    }))
+    egress_ipv4 = list(object({
+      description = string
+      from_port   = number
+      to_port     = number
+      protocol    = string
+      cidr_blocks = list(string)
+      self        = bool
+    }))
+  })
+  default = { ingress_ipv4 = [], egress_ipv4 = [] }
+}
+
+# === Ingresses ===
+
+variable "ingresses" {
+  description = "Configure ingress (ALB) for specific nodegroup roles"
+  type = map(object({
+    nodegroups = list(string)
+
+    routes = map(object({
+      port_incoming = number
+      port_target   = number
+      protocol      = string
+    }))
+  }))
+  default = {}
 }
 
 # === Machines ===

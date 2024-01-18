@@ -1,3 +1,4 @@
+
 resource "aws_security_group" "common" {
   name        = "${var.name}-common"
   description = "mke cluster common rules"
@@ -5,79 +6,75 @@ resource "aws_security_group" "common" {
 
   tags = merge({
     stack = var.name
-    role = "sg"
-    unit = "common"
+    role  = "sg"
+    unit  = "common"
   }, var.tags)
 
-  ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
-  }
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+}
 
-  ingress {
-    from_port = 2379
-    to_port   = 2380
-    protocol  = "tcp"
-    self      = true
-  }
+locals {
+  // SG Rules have conflicts between cidr and self, so we have to build lists for each case
+  // This should not create any ordering issues as the two sets of rules are almost
+  // always separated in firewall building.
+  ingress_ipv4_self    = [for i in var.firewall.ingress_ipv4 : i if i.self]
+  ingress_ipv4_notself = [for i in var.firewall.ingress_ipv4 : i if !i.self]
+  egress_ipv4_self     = [for i in var.firewall.egress_ipv4 : i if i.self]
+  egress_ipv4_notself  = [for i in var.firewall.egress_ipv4 : i if !i.self]
+}
 
-  ingress {
-    from_port   = 8443
-    to_port     = 8443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_security_group_rule" "in_ipv4_self" {
+  count = length(local.ingress_ipv4_self)
 
-  ingress {
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  description = local.ingress_ipv4_self[count.index].description
+  type        = "ingress"
+  self        = true
 
-  ingress {
-    from_port   = 3389
-    to_port     = 3389
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  security_group_id = aws_security_group.common.id
 
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  from_port = local.ingress_ipv4_self[count.index].from_port
+  protocol  = local.ingress_ipv4_self[count.index].protocol
+  to_port   = local.ingress_ipv4_self[count.index].to_port
+}
 
-  ingress {
-    from_port   = 5985
-    to_port     = 5986
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_security_group_rule" "in_ipv4" {
+  count = length(local.ingress_ipv4_notself)
 
-# nodeport_range as described here:
-# https://docs.mirantis.com/mke/3.6/ops/administer-cluster/configure-an-mke-cluster/configuration-options.html?highlight=nodeport_range
-  ingress {
-    from_port   = 32768
-    to_port     = 35535
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  description = local.ingress_ipv4_notself[count.index].description
+  type        = "ingress"
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  security_group_id = aws_security_group.common.id
+
+  cidr_blocks = local.ingress_ipv4_notself[count.index].cidr_blocks
+  from_port   = local.ingress_ipv4_notself[count.index].from_port
+  protocol    = local.ingress_ipv4_notself[count.index].protocol
+  to_port     = local.ingress_ipv4_notself[count.index].to_port
+}
+
+resource "aws_security_group_rule" "out_ipv4_self" {
+  count = length(local.egress_ipv4_self)
+
+  description = local.egress_ipv4_self[count.index].description
+  type        = "egress"
+  self        = true
+
+  security_group_id = aws_security_group.common.id
+
+  from_port = local.egress_ipv4_self[count.index].from_port
+  protocol  = local.egress_ipv4_self[count.index].protocol
+  to_port   = local.egress_ipv4_self[count.index].to_port
+}
+
+resource "aws_security_group_rule" "out_ipv4" {
+  count = length(local.egress_ipv4_notself)
+
+  description = local.egress_ipv4_notself[count.index].description
+  type        = "egress"
+
+  security_group_id = aws_security_group.common.id
+
+  cidr_blocks = local.egress_ipv4_notself[count.index].cidr_blocks
+  from_port   = local.egress_ipv4_notself[count.index].from_port
+  protocol    = local.egress_ipv4_notself[count.index].protocol
+  to_port     = local.egress_ipv4_notself[count.index].to_port
 }
